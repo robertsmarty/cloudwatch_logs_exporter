@@ -1,0 +1,104 @@
+Parameters:
+  AMI:
+    Type: String
+  SecurityGroup:
+    Type: String
+  AZ:
+    Type: String
+  SubnetId:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  SNSTopic:
+    Type: String
+  Bucket:
+    Type: String
+Resources:    
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones:
+        - !Ref AZ
+      VPCZoneIdentifier: !Ref SubnetId
+      LaunchConfigurationName:
+        Ref: LaunchConfig
+      MinSize: '0'
+      MaxSize: '0'
+  ScheduledActionUp: 
+    Type: "AWS::AutoScaling::ScheduledAction"
+    Properties:
+      AutoScalingGroupName: 
+        Ref: "AutoScalingGroup"
+      MaxSize: 1
+      MinSize: 1
+      Recurrence: "0 0 * * *"
+  ScheduledActionDown: 
+    Type: "AWS::AutoScaling::ScheduledAction"
+    Properties:
+      AutoScalingGroupName: 
+        Ref: "AutoScalingGroup"
+      MaxSize: 0
+      MinSize: 0
+      Recurrence: "50 0 * * *"
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !Ref AMI
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          export LOGS_REGION=${AWS::Region}
+          export LOGS_SNS_TOPIC=${SNSTopic}
+          export LOGS_BUCKET=${Bucket}
+          sudo pip install boto3
+          aws s3 cp s3://${Bucket}/exportlogs.py .
+          python exportlogs.py
+      SecurityGroups:
+      - Ref: SecurityGroup
+      InstanceType: t2.micro
+      BlockDeviceMappings:
+      - DeviceName: "/dev/xvda"
+        Ebs:
+          VolumeSize: '8'
+          DeleteOnTermination: "True"
+          VolumeType: "gp2"
+  InstanceProfile:          
+    Type: "AWS::IAM::InstanceProfile"
+    Properties: 
+      Roles:
+        - !Ref EC2IAMRole 
+  EC2IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "ec2.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: !Sub 'EC2CloudWatchLogsExport'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - 
+                Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: "arn:aws:sns:*:*:*"
+              - 
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: "arn:aws:s3:::*/*"                
+              - 
+                Effect: Allow
+                Action:
+                  - logs:CreateExportTask
+                  - logs:DescribeExportTasks
+                  - logs:DescribeLogGroups
+                Resource: "arn:aws:logs:*:*:*"
