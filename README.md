@@ -113,7 +113,7 @@ aws s3 cp s3://[bucket]/exportlogs.py .
 python exportlogs.py
 ```
 
-### Auto Scaling Group Configuration###
+### Auto Scaling Group Configuration ###
 
 Create an auto scaling group "CloudWatchLogsExport" using the "CloudWatchLogsExport-vX.X" launch configuration, with 0 instances, utilising a private subnet and no scaling policy.
 
