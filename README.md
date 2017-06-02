@@ -136,6 +136,6 @@ PENDING
 COMPLETED
 ```
 
-### CloudFormatioon ###
+### CloudFormation ###
 
 Don't want to do things manually? Then use the CloudFormation script in this repo!
